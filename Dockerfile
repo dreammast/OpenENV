@@ -30,12 +30,13 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV TASK_DIFFICULTY=medium
 
-# Expose ports
-EXPOSE 3000 8000
+# Expose port 8000 for OpenEnv API and Dashboard
+EXPOSE 8000
 
-# Health check - check if Dashboard is responsive
+# Health check - check if Dashboard/API is responsive
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the entrypoint script which starts both servers
-ENTRYPOINT ["./entrypoint.sh"]
+# Run the dashboard app which now includes OpenEnv API endpoints
+# This makes it compatible with both the validator (port 8000) and the interactive dashboard
+CMD python -m uvicorn dashboard.app:app --host 0.0.0.0 --port 8000
