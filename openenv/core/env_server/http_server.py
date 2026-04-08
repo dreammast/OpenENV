@@ -35,12 +35,18 @@ class HTTPEnvServer:
             self.current_session_id = session_id
             obs = env.reset()
             obs_dict = obs.model_dump() if hasattr(obs, 'model_dump') else obs.dict()
+            
+            # Ensure observation includes done and reward
+            if 'done' not in obs_dict:
+                obs_dict['done'] = False
+            if 'reward' not in obs_dict:
+                obs_dict['reward'] = 0.0
+            
             response = {
-                "session_id": session_id,
+                "episode_id": session_id,
                 "observation": obs_dict,
-                "episode_id": session_id[:8],
-                "step_count": 0,
-                "done": False,
+                "done": obs_dict.get('done', False),
+                "reward": obs_dict.get('reward', 0.0),
                 "error": None
             }
             return response
@@ -72,17 +78,20 @@ class HTTPEnvServer:
                     # Observation object itself (our case)
                     obs_dict = result.model_dump() if hasattr(result, 'model_dump') else result.dict()
                     # Extract reward and done from the observation itself
-                    obs_reward = result.reward if hasattr(result, 'reward') else 0.0
-                    obs_done = result.done if hasattr(result, 'done') else False
-                    obs_info = result.metadata if hasattr(result, 'metadata') else {}
+                    obs_reward = getattr(result, 'reward', 0.0)
+                    obs_done = getattr(result, 'done', False)
+                    obs_info = getattr(result, 'metadata', {})
+                
+                # Get step count from environment
+                step_count = getattr(env._state, 'step_count', 0) if hasattr(env, '_state') else 0
                 
                 response = {
+                    "episode_id": self.current_session_id,
                     "observation": obs_dict,
                     "reward": obs_reward,
                     "done": obs_done,
                     "info": obs_info,
-                    "episode_id": self.current_session_id[:8],
-                    "step_count": getattr(env, 'step_count', self._state.step_count) if hasattr(self, '_state') else getattr(env, '_state', {}).step_count,
+                    "step_count": step_count,
                     "error": None
                 }
                 return response
