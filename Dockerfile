@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get-update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,7 +19,11 @@ RUN pip install --no-cache-dir -r requirements_server.txt && \
 COPY openenv_core_submission/ ./openenv_core_submission/
 COPY openenv/ ./openenv/
 COPY dashboard/ ./dashboard/
+COPY entrypoint.sh ./entrypoint.sh
 COPY README.md ./README.md
+
+# Make entrypoint script executable
+RUN chmod +x ./entrypoint.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -29,11 +33,9 @@ ENV TASK_DIFFICULTY=medium
 # Expose ports
 EXPOSE 3000 8000
 
-# Health check
+# Health check - check if Dashboard is responsive
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:3000/', timeout=5).status_code == 200 or exit(1)" || exit 1
+    CMD curl -f http://localhost:3000/ || exit 1
 
-# Start both servers: OpenEnv on 8000, Dashboard on 3000
-CMD sh -c 'python -m uvicorn openenv_core_submission.server.app:app --host 0.0.0.0 --port 8000 &' && \
-    sleep 2 && \
-    python -m uvicorn dashboard.app:app --host 0.0.0.0 --port 3000
+# Run the entrypoint script which starts both servers
+ENTRYPOINT ["./entrypoint.sh"]
