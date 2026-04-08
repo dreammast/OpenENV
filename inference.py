@@ -27,9 +27,15 @@ load_dotenv()
 class InferenceAgent:
     """Base agent for running inference on education environments"""
     
-    def __init__(self):
-        """Initialize with Groq or OpenAI API"""
+    def __init__(self, use_llm: bool = True):
+        """Initialize with Groq or OpenAI API (fallback to heuristics if unavailable)"""
+        self.use_llm = use_llm
         self.use_groq = False
+        self.step_counter = 0
+        
+        if not use_llm:
+            print("[OK] Using heuristic-based agent (no LLM required)")
+            return
         
         # Try OpenAI first
         self.api_key = os.environ.get("OPENAI_API_KEY")
@@ -42,9 +48,9 @@ class InferenceAgent:
         self.groq_model = os.environ.get("GROQ_MODEL", "mixtral-8x7b-32768")
         
         if not self.api_key and not self.groq_api_key:
-            print("[ERROR] No API keys found")
-            print("Please set OPENAI_API_KEY or GROQ_API_KEY in .env")
-            exit(1)
+            print("[WARN] No API keys found. Falling back to heuristics.")
+            self.use_llm = False
+            return
         
         # Initialize client
         if self.api_key:
@@ -60,15 +66,63 @@ class InferenceAgent:
     def _switch_to_groq(self):
         """Switch to Groq fallback"""
         if not self.groq_api_key:
-            print("[ERROR] Groq API key not available")
-            exit(1)
+            print("[WARN] Groq API key not available. Falling back to heuristics.")
+            self.use_llm = False
+            return
         self.use_groq = True
         self.client = OpenAI(api_key=self.groq_api_key, base_url=self.groq_base_url)
         self.model_name = self.groq_model
         print("[FALLBACK] Switched to Groq: {}".format(self.model_name))
     
-    def get_action(self, prompt: str) -> dict:
-        """Call LLM to get next action"""
+    def get_action_heuristic(self, task: str, obs: dict) -> dict:
+        """Generate action using heuristics (no LLM required)"""
+        self.step_counter += 1
+        
+        if task == "easy":
+            # Quiz tutor heuristic
+            topics = ["fractions", "algebra", "geometry", "statistics"]
+            topic = topics[self.step_counter % len(topics)]
+            
+            # Adjust difficulty based on feedback
+            reward = obs.get("reward", 0.0)
+            turns_left = obs.get("turns_remaining", 8)
+            base_difficulty = max(1, min(4, 2 + int(reward * 2)))
+            
+            return {
+                "topic": topic,
+                "difficulty": base_difficulty,
+                "question_text": "Question: {}".format(self.step_counter)
+            }
+        
+        elif task == "medium":
+            # Essay coach heuristic
+            feedback_types = ["grammar_correction", "clarity_improvement", "structure_feedback"]
+            focus_areas = ["grammar", "clarity", "content"]
+            feedback_type = feedback_types[self.step_counter % len(feedback_types)]
+            focus_area = focus_areas[self.step_counter % len(focus_areas)]
+            
+            return {
+                "feedback_type": feedback_type,
+                "focus_area": focus_area,
+                "specificity": max(1, min(3, 1 + (self.step_counter // 4)))
+            }
+        
+        else:  # hard
+            # Dropout counselor heuristic
+            intervention_types = ["academic_tutoring", "mentorship", "financial_aid"]
+            intervention_type = intervention_types[self.step_counter % len(intervention_types)]
+            
+            return {
+                "intervention_type": intervention_type,
+                "intensity": max(1, min(3, 1 + (self.step_counter // 3))),
+                "rationale": "Support step {}".format(self.step_counter)
+            }
+    
+    def get_action(self, prompt: str, task: str = "medium", obs: dict = None) -> dict:
+        """Call LLM to get next action, with heuristic fallback"""
+        if not self.use_llm or obs is None:
+            return self.get_action_heuristic(task, obs or {})
+        
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -87,17 +141,19 @@ class InferenceAgent:
             text = text.replace("```json", "").replace("```", "").strip()
             return json.loads(text)
         except Exception as e:
-            print("[ERROR] LLM call failed: {}".format(e))
+            print("[WARN] LLM call failed: {}. Using heuristics.".format(str(e)[:50]))
             # Try Groq fallback if using OpenAI
             if not self.use_groq and self.groq_api_key:
                 print("[FALLBACK] Attempting Groq fallback...")
                 self._switch_to_groq()
-                try:
-                    return self.get_action(prompt)
-                except Exception as groq_error:
-                    print("[ERROR] Groq also failed: {}".format(groq_error))
-                    return None
-            return None
+                if self.use_llm:
+                    try:
+                        return self.get_action(prompt, task, obs)
+                    except Exception as groq_error:
+                        print("[WARN] Groq also failed. Using heuristics.")
+            
+            # Fall back to heuristics
+            return self.get_action_heuristic(task, obs or {})
 
 
 # Prompt templates
@@ -129,7 +185,7 @@ def run_episode(task: str, port: int = 8000, max_steps: int = 10) -> dict:
     try:
         reset_res = requests.post("{}/reset".format(base_url), timeout=10).json()
     except Exception as e:
-        print("[ERROR] Failed to connect to server")
+        print("[ERROR] Failed to connect to server: {}".format(e))
         return {
             "task": task,
             "status": "error",
@@ -146,9 +202,9 @@ def run_episode(task: str, port: int = 8000, max_steps: int = 10) -> dict:
     while not done and step_count < max_steps:
         step_count += 1
         
-        # Get action from LLM
+        # Get action from LLM or heuristics
         prompt = PROMPTS[task].format(state=json.dumps(obs, indent=2))
-        action = agent.get_action(prompt)
+        action = agent.get_action(prompt, task, obs)
         
         if not action:
             print("[WARN] Failed to get action at step {}".format(step_count))
