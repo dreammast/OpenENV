@@ -1,3 +1,13 @@
+---
+title: OpenEnv - Education AI Training
+emoji: 🧠
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: dashboard/app.py
+pinned: false
+---
+
 # 🧠 OpenEnv — Education AI Track (Submission)
 
 > **Reinforcement Learning for Adaptive Education** — A suite of three interactive environments designed to train AI agents in personalized tutoring, intensive coaching, and student retention strategies.
