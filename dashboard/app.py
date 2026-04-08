@@ -87,6 +87,16 @@ async def proxy(env: str, path: str, request: Request):
         url = f"{base_url}/{path}"
         if request.method == "POST":
             r = req.post(url, data=body, headers={"Content-Type": "application/json"}, timeout=10)
+        else:
+            r = req.get(url, timeout=10)
+        return JSONResponse(content=r.json(), status_code=r.status_code)
+    except req.ConnectionError:
+        return JSONResponse(
+            content={"error": f"{env.title()} env server not running on {base_url}"},
+            status_code=503,
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 # ─ Health Check ────────────────────────────────────────────────────────────
