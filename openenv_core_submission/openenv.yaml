@@ -1,0 +1,24 @@
+spec_version: 1
+name: education_agent_suite
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+
+tasks:
+  - id: easy
+    name: Math Quiz Tutor
+    description: Adapts math quiz difficulty to student mastery.
+  - id: medium
+    name: Essay Feedback Coach
+    description: Provides feedback to improve essay quality across dimensions.
+  - id: hard
+    name: Dropout Risk Intervention
+    description: Identifies and intervenes in high-risk student dropout cases.
+
+metadata:
+  version: 0.1.0
+  author: AgentProject
+  category: Education
+  tags: ["RL", "LLM", "Education", "Tutoring"]
+

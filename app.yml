@@ -1,0 +1,11 @@
+# Hugging Face Spaces Configuration
+title: OpenEnv - Education AI Training
+emoji: 🧠
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: dashboard/app.py
+python_version: 3.11
+fullWidth: true
+hf_oauth: false
+app_port: 3000

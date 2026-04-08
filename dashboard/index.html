@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenEnv — Agent Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --border: rgba(75, 85, 99, 0.3);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --accent-yellow: #eab308;
+            --gradient-1: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-2: linear-gradient(135deg, #10b981, #06b6d4);
+            --gradient-3: linear-gradient(135deg, #f59e0b, #ef4444);
+            --gradient-yellow: linear-gradient(135deg, #eab308, #f59e0b);
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(59,130,246,0.03) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(139,92,246,0.03) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 80%, rgba(16,185,129,0.02) 0%, transparent 50%);
+            z-index: 0;
+            animation: bgDrift 30s ease-in-out infinite alternate;
+        }
+        @keyframes bgDrift { 0% { transform: translate(0,0); } 100% { transform: translate(-2%,-1%); } }
+
+        .header {
+            position: relative; z-index: 10;
+            padding: 1.25rem 2rem;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            background: rgba(10, 14, 26, 0.8);
+        }
+        .header-left { display: flex; align-items: center; gap: 1rem; }
+        .logo {
+            width: 36px; height: 36px;
+            background: var(--gradient-1);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            box-shadow: 0 0 20px rgba(59,130,246,0.3);
+        }
+        .header h1 { font-size: 1.15rem; font-weight: 600; letter-spacing: -0.02em; }
+        .header h1 span { color: var(--text-secondary); font-weight: 400; }
+        .header-right { display: flex; gap: 0.6rem; align-items: center; }
+
+        .status-pill {
+            display: flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border-radius: 999px;
+            font-size: 0.72rem; font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .status-dot.offline { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); animation: none; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+        .main { position: relative; z-index: 10; padding: 1.5rem 2rem; max-width: 1440px; margin: 0 auto; }
+
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 1.5rem;
+            background: var(--bg-secondary); border-radius: 12px;
+            padding: 4px; width: fit-content; border: 1px solid var(--border);
+        }
+        .tab {
+            padding: 8px 18px; border-radius: 8px;
+            font-size: 0.8rem; font-weight: 500;
+            cursor: pointer; color: var(--text-secondary);
+            transition: all 0.2s; border: none; background: transparent;
+            font-family: inherit;
+        }
+        .tab:hover { color: var(--text-primary); }
+        .tab.active { color: white; box-shadow: 0 2px 10px rgba(59,130,246,0.3); }
+        .tab.active[data-env="easy"] { background: var(--gradient-2); }
+        .tab.active[data-env="medium"] { background: var(--gradient-yellow); color: #1a1a2e; }
+        .tab.active[data-env="hard"] { background: var(--gradient-3); }
+
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 1.25rem;
+            backdrop-filter: blur(20px); transition: border-color 0.3s;
+        }
+        .card:hover { border-color: rgba(75,85,99,0.5); }
+        .card-title {
+            font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-secondary);
+            margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;
+        }
+
+        .grid-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 1.1rem 1.25rem;
+        }
+        .stat-label { font-size: 0.72rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 6px; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em; }
+        .stat-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+
+        .grid-main { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .grid-bottom { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
+
+        .btn {
+            padding: 10px 22px; border-radius: 10px; font-size: 0.82rem; font-weight: 600;
+            cursor: pointer; border: none; transition: all 0.2s; font-family: inherit;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--gradient-1); color: white; box-shadow: 0 2px 12px rgba(59,130,246,0.3); }
+        .btn-primary:hover { box-shadow: 0 4px 20px rgba(59,130,246,0.5); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); }
+        .btn-danger { background: linear-gradient(135deg,#ef4444,#dc2626); color: white; }
+
+        .mastery-bar-container { margin-bottom: 14px; }
+        .mastery-bar-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.8rem; }
+        .mastery-bar-label { font-weight: 500; }
+        .mastery-bar-value { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+        .mastery-bar-track { height: 8px; background: rgba(75,85,99,0.2); border-radius: 4px; overflow: hidden; }
+        .mastery-bar-fill {
+            height: 100%; border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.16,1,0.3,1); min-width: 2px;
+        }
+        /* Easy colors */
+        .mastery-bar-fill.fractions { background: var(--gradient-1); }
+        .mastery-bar-fill.algebra { background: var(--gradient-2); }
+        .mastery-bar-fill.geometry { background: linear-gradient(135deg,var(--accent-purple),#ec4899); }
+        .mastery-bar-fill.statistics { background: var(--gradient-3); }
+        /* Medium colors */
+        .mastery-bar-fill.structure { background: linear-gradient(135deg,#3b82f6,#2563eb); }
+        .mastery-bar-fill.grammar { background: linear-gradient(135deg,#10b981,#059669); }
+        .mastery-bar-fill.content { background: linear-gradient(135deg,#8b5cf6,#7c3aed); }
+        .mastery-bar-fill.creativity { background: linear-gradient(135deg,#f59e0b,#d97706); }
+        .mastery-bar-fill.coherence { background: linear-gradient(135deg,#06b6d4,#0891b2); }
+        /* Hard colors */
+        .mastery-bar-fill.academic_struggle { background: linear-gradient(135deg,#ef4444,#f97316); }
+        .mastery-bar-fill.financial_stress { background: linear-gradient(135deg,#f59e0b,#eab308); }
+        .mastery-bar-fill.social_isolation { background: linear-gradient(135deg,#8b5cf6,#6366f1); }
+        .mastery-bar-fill.mental_health { background: linear-gradient(135deg,#ec4899,#f43f5e); }
+        .mastery-bar-fill.attendance_decline { background: linear-gradient(135deg,#06b6d4,#0ea5e9); }
+
+        .action-log { max-height: 360px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(75,85,99,0.3) transparent; }
+        .action-log::-webkit-scrollbar { width: 4px; }
+        .action-log::-webkit-scrollbar-thumb { background: rgba(75,85,99,0.3); border-radius: 2px; }
+
+        .log-entry {
+            padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
+            font-size: 0.78rem; background: rgba(31,41,55,0.5);
+            border-left: 3px solid var(--border); animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+        .log-entry.correct { border-left-color: var(--accent-green); }
+        .log-entry.wrong { border-left-color: var(--accent-red); }
+        .log-entry.system { border-left-color: var(--accent-blue); }
+        .log-entry.reward { border-left-color: var(--accent-orange); }
+        .log-entry.medium { border-left-color: var(--accent-yellow); }
+        .log-meta { color: var(--text-muted); font-size: 0.7rem; margin-top: 3px; }
+
+        .chart-container { position: relative; width: 100%; height: 200px; }
+        .chart-container canvas { width: 100%; height: 100%; }
+
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+        .speed-label { font-size: 0.75rem; color: var(--text-secondary); margin-left: auto; }
+        select {
+            padding: 8px 12px; border-radius: 8px; background: var(--bg-secondary);
+            color: var(--text-primary); border: 1px solid var(--border); font-family: inherit; font-size: 0.8rem;
+        }
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .empty-state p { font-size: 0.85rem; }
+
+        .grade-badge {
+            display: inline-block; padding: 2px 10px; border-radius: 6px;
+            font-weight: 700; font-size: 0.85rem;
+        }
+        .grade-A { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .grade-B { background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+        .grade-C { background: rgba(245,158,11,0.2); color: var(--accent-orange); }
+        .grade-D { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .grade-F { background: rgba(239,68,68,0.3); color: #fca5a5; }
+
+        @media (max-width: 900px) {
+            .grid-stats { grid-template-columns: repeat(2, 1fr); }
+            .grid-main, .grid-bottom { grid-template-columns: 1fr; }
+            .main { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-left">
+        <div class="logo">🧠</div>
+        <h1>OpenEnv <span>· Agent Dashboard</span></h1>
+    </div>
+    <div class="header-right">
+        <div class="status-pill"><div class="status-dot offline" id="dot-unified"></div>Unified Server :8000</div>
+    </div>
+</header>
+
+<div class="main">
+    <div class="tabs">
+        <button class="tab active" data-env="easy" onclick="switchEnv('easy')">🟢 Easy — Quiz Tutor</button>
+        <button class="tab" data-env="medium" onclick="switchEnv('medium')">🟡 Medium — Essay Coach</button>
+        <button class="tab" data-env="hard" onclick="switchEnv('hard')">🔴 Hard — Dropout Risk</button>
+    </div>
+
+    <div class="grid-stats">
+        <div class="stat-card">
+            <div class="stat-label">Episodes</div>
+            <div class="stat-value" id="stat-episodes">0</div>
+            <div class="stat-sub" id="stat-episodes-sub">No episodes run</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Reward</div>
+            <div class="stat-value" id="stat-reward" style="color:var(--accent-green)">0.00</div>
+            <div class="stat-sub" id="stat-reward-sub">cumulative</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Current Step</div>
+            <div class="stat-value" id="stat-step">—</div>
+            <div class="stat-sub" id="stat-step-sub">idle</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg Reward</div>
+            <div class="stat-value" id="stat-avg" style="color:var(--accent-cyan)">—</div>
+            <div class="stat-sub" id="stat-avg-sub">per episode</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value" id="stat-success" style="color:var(--accent-green)">—%</div>
+            <div class="stat-sub" id="stat-success-sub">correct/total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg Mastery</div>
+            <div class="stat-value" id="stat-mastery" style="color:var(--accent-orange)">—%</div>
+            <div class="stat-sub" id="stat-mastery-sub">convergence</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Strategy</div>
+            <div class="stat-value" id="stat-strategy" style="color:var(--accent-blue); font-size:0.9rem">Balanced</div>
+            <div class="stat-sub" id="stat-strategy-sub">active</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Efficiency</div>
+            <div class="stat-value" id="stat-efficiency" style="color:var(--accent-cyan)">—</div>
+            <div class="stat-sub" id="stat-efficiency-sub">reward/step</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-primary" id="btn-run" onclick="runEpisode()">▶ Run Episode</button>
+        <button class="btn btn-primary" id="btn-auto" onclick="autoRun()">⚡ Auto-Run 3</button>
+        <button class="btn btn-danger" id="btn-stop" onclick="stopRun()" style="display:none">⏹ Stop</button>
+        <button class="btn btn-secondary" onclick="clearAll()">🗑 Clear</button>
+        <div style="margin-left: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-secondary);">
+            <label for="strategy">Agent Strategy:</label>
+            <select id="strategy" onchange="updateStrategy()" style="padding: 6px 10px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); font-family: inherit; font-size: 0.75rem;">
+                <option value="adaptive">🎯 Adaptive (Focus Weakest)</option>
+                <option value="progressive">📈 Progressive (Increase Difficulty)</option>
+                <option value="balanced" selected>⚖️ Balanced (Mixed)</option>
+                <option value="conservative">🛡️ Conservative (Build Confidence)</option>
+            </select>
+        </div>
+        <span class="speed-label">Speed:</span>
+        <select id="speed" onchange="updateSpeed()">
+            <option value="800">Normal</option>
+            <option value="300">Fast</option>
+            <option value="100">Instant</option>
+            <option value="1500">Slow</option>
+        </select>
+    </div>
+
+    <div class="grid-main">
+        <div class="card">
+            <div class="card-title"><span id="bars-icon">📊</span> <span id="bars-title">Student Mastery</span></div>
+            <div id="bars-container"><div class="empty-state"><div class="icon">📭</div><p>Run an episode to see data</p></div></div>
+        </div>
+        <div class="card">
+            <div class="card-title">📈 Reward Trend</div>
+            <div class="chart-container"><canvas id="rewardChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="grid-main">
+        <div class="card">
+            <div class="card-title">📊 Mastery Convergence</div>
+            <div class="chart-container"><canvas id="convergenceChart"></canvas></div>
+        </div>
+        <div class="card">
+            <div class="card-title">🎯 Performance Metrics</div>
+            <div id="performance-metrics" style="font-size:0.8rem; line-height:2;">
+                <div style="margin-bottom: 8px;">
+                    <strong>Episodes:</strong> <span id="perf-episodes">0</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Total Steps:</strong> <span id="perf-steps">0</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Avg Steps/Episode:</strong> <span id="perf-avg-steps">—</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Best Episode:</strong> <span id="perf-best" style="color: var(--accent-green)">—</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Worst Episode:</strong> <span id="perf-worst" style="color: var(--accent-red)">—</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>Cumulative Mastery:</strong> <span id="perf-mastery" style="color: var(--accent-cyan)">—%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-bottom">
+        <div class="card">
+            <div class="card-title">📝 Agent Action Log</div>
+            <div class="action-log" id="action-log"><div class="empty-state"><div class="icon">🤖</div><p>Agent actions will appear here in real-time</p></div></div>
+        </div>
+        <div class="card">
+            <div class="card-title">ℹ️ Episode Summary</div>
+            <div id="episode-summary"><div class="empty-state"><div class="icon">📋</div><p>Summary after episode completes</p></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentEnv = 'easy', running = false, stopped = false, stepDelay = 800;
+let currentStrategy = 'balanced';
+let monitorInterval = null, lastMonitorEpisode = null, lastMonitorStep = null;
+let episodes = [], totalReward = 0, rewardHistory = [], masteryHistory = [];
+let totalSteps = 0, successCount = 0, totalActions = 0;
+let convergenceData = { easy: [], medium: [], hard: [] };
+
+async function toggleMonitor() {
+    const isChecked = document.getElementById('chk-monitor').checked;
+    document.getElementById('btn-run').disabled = isChecked;
+    document.getElementById('btn-auto').disabled = isChecked;
+    
+    if (isChecked) {
+        addLog("📺 Monitor Mode Enabled. Watching server...", "system");
+        monitorInterval = setInterval(pollState, 1500);
+    } else {
+        clearInterval(monitorInterval);
+        addLog("📺 Monitor Mode Disabled.", "system");
+    }
+}
+
+async function pollState() {
+    try {
+        const stateData = await apiCall(currentEnv, 'state', 'GET');
+        if (!stateData || !stateData.episode_id) return;
+        
+        // If it's a new episode, handle reset
+        if (stateData.episode_id !== lastMonitorEpisode) {
+            lastMonitorEpisode = stateData.episode_id;
+            lastMonitorStep = -1;
+            addLog(`📺 Detected New Remote Episode: ${stateData.episode_id.slice(0,8)}`, "system");
+            clearChart();
+            rewardHistory = [];
+        }
+        
+        // If it's a new step, update UI
+        if (stateData.step_count !== lastMonitorStep) {
+            lastMonitorStep = stateData.step_count;
+            // Get full observation to update bars
+            const obs = stateData.observation || stateData;
+            updateBars(obs);
+            updateStats(episodes.length + 1, lastMonitorStep);
+            
+            // Check for reward in the state if available
+            const reward = stateData.reward || 0;
+            if (reward !== 0) {
+                rewardHistory.push(reward);
+                drawChart();
+            }
+        }
+    } catch (e) { console.error("Poll error:", e); }
+}
+
+const TOPICS = ['fractions','algebra','geometry','statistics'];
+const QUALITY_DIMS = ['structure','grammar','content','creativity','coherence'];
+const FEEDBACK_TYPES = ['structural_reorganize','grammar_correction','content_deepening','creative_suggestion','coherence_linking','thesis_strengthening','evidence_addition','style_refinement'];
+const FEEDBACK_TARGETS = {
+    structural_reorganize:['structure'], grammar_correction:['grammar'],
+    content_deepening:['content'], creative_suggestion:['creativity'],
+    coherence_linking:['coherence'], thesis_strengthening:['structure','content'],
+    evidence_addition:['content','coherence'], style_refinement:['creativity','grammar'],
+};
+const INTERVENTION_TYPES = ['academic_tutoring','financial_aid_review','mental_health_referral','peer_mentorship','study_group','career_guidance','family_outreach','flexible_schedule'];
+const INTERVENTION_TARGETS = {
+    academic_tutoring:'academic_struggle', financial_aid_review:'financial_stress',
+    mental_health_referral:'mental_health', peer_mentorship:'social_isolation',
+    study_group:'academic_struggle', career_guidance:'mental_health',
+    family_outreach:'social_isolation', flexible_schedule:'attendance_decline',
+};
+
+const ENV_CONFIG = {
+    easy:   { maxSteps: 8,  barsTitle: 'Student Mastery', barsIcon: '📊' },
+    medium: { maxSteps: 5,  barsTitle: 'Essay Quality',   barsIcon: '✍️' },
+    hard:   { maxSteps: 7,  barsTitle: 'Risk Factors',    barsIcon: '⚠️' },
+};
+
+// ── Strategy Selection ─────────────────────────────────────────────────
+function updateStrategy() {
+    currentStrategy = document.getElementById('strategy').value;
+    const strategyNames = {
+        'adaptive': '🎯 Adaptive',
+        'progressive': '📈 Progressive', 
+        'balanced': '⚖️ Balanced',
+        'conservative': '🛡️ Conservative'
+    };
+    document.getElementById('stat-strategy').textContent = strategyNames[currentStrategy];
+    addLog(`🔧 Strategy changed to: ${strategyNames[currentStrategy]}`, 'system');
+}
+
+// ── Enhanced Agent Decisions with Strategies ──────────────────────────
+function agentDecideEasy(obs, episodeNum = 1) {
+    const scores = obs.student_profile?.topic_scores || {};
+    let topics = TOPICS.map(t => ({topic: t, score: scores[t]||0}));
+    topics.sort((a,b) => a.score - b.score);
+    
+    let chosen, difficulty;
+    
+    if (currentStrategy === 'adaptive') {
+        chosen = topics[0].topic;
+        difficulty = Math.ceil(topics[0].score * 4) + 1;
+    } else if (currentStrategy === 'progressive') {
+        chosen = topics[Math.floor(episodeNum % TOPICS.length)].topic;
+        difficulty = Math.min(4, 1 + Math.floor(episodeNum / 3));
+    } else if (currentStrategy === 'conservative') {
+        chosen = topics[Math.floor(TOPICS.length / 2)].topic;
+        difficulty = Math.max(1, Math.ceil(topics[Math.floor(TOPICS.length / 2)].score * 2));
+    } else {
+        const idx = episodeNum % 2 === 0 ? 0 : Math.floor(TOPICS.length / 2);
+        chosen = topics[idx].topic;
+        difficulty = Math.ceil(topics[idx].score * 3) + 1;
+    }
+    
+    difficulty = Math.min(4, Math.max(1, difficulty));
+    const reason = `Strategy: ${currentStrategy} | Mastery: ${(topics[0].score*100).toFixed(0)}%`;
+    return { topic: chosen, difficulty, question_text: `${chosen} level ${difficulty}`, reason };
+}
+
+let lastFeedbackType = null;
+function agentDecideMedium(obs, episodeNum = 1) {
+    const scores = obs.essay_profile?.quality_scores || {};
+    const weakest = obs.essay_profile?.weakest_area || 'grammar';
+    
+    let options = [];
+    for (const [ft, targets] of Object.entries(FEEDBACK_TARGETS)) {
+        if (targets.includes(weakest)) options.push(ft);
+    }
+    
+    let ftype = options[0] || 'grammar_correction';
+    if (currentStrategy === 'conservative') {
+        ftype = options[episodeNum % options.length];
+    } else if (currentStrategy === 'progressive') {
+        ftype = options[episodeNum % options.length];
+    }
+    
+    lastFeedbackType = ftype;
+    const weakVal = scores[weakest] || 0.3;
+    let spec = currentStrategy === 'progressive' ? Math.min(3, 1 + Math.floor(episodeNum / 2)) : (weakVal < 0.3 ? 3 : weakVal < 0.5 ? 2 : 1);
+    
+    const reason = `Strategy: ${currentStrategy} | Weakest: ${weakest} (${(weakVal*100).toFixed(0)}%)`;
+    return { feedback_type: ftype, focus_area: weakest, specificity: spec, reason };
+}
+
+function agentDecideHard(obs, episodeNum = 1) {
+    const risks = obs.student_profile?.risk_factors || {};
+    let factors = Object.entries(risks).sort((a,b) => b[1] - a[1]);
+    
+    let targetFactor = factors[0][0];
+    if (currentStrategy === 'adaptive') {
+        targetFactor = factors[0][0];
+    } else if (currentStrategy === 'progressive') {
+        targetFactor = factors[episodeNum % factors.length][0];
+    } else if (currentStrategy === 'conservative') {
+        targetFactor = factors[0][0];
+    }
+    
+    let bestInt = 'academic_tutoring';
+    for (const [it, tgt] of Object.entries(INTERVENTION_TARGETS)) {
+        if (tgt === targetFactor) { bestInt = it; break; }
+    }
+    
+    let intensity = currentStrategy === 'progressive' ? Math.min(3, 1 + Math.floor(episodeNum / 2)) : (factors[0][1] > 0.65 ? 3 : 2);
+    const reason = `Strategy: ${currentStrategy} | Risk: ${targetFactor} (${(factors[0][1]*100).toFixed(0)}%)`;
+    
+    return { intervention_type: bestInt, intensity, rationale: reason };
+}
+
+// ── Update Performance Metrics ─────────────────────────────────────────
+function updateMetrics() {
+    const avgSteps = episodes.length > 0 ? (totalSteps / episodes.length).toFixed(1) : '—';
+    const bestEp = episodes.length > 0 ? Math.max(...episodes).toFixed(3) : '—';
+    const worstEp = episodes.length > 0 ? Math.min(...episodes).toFixed(3) : '—';
+    const masteryAvg = masteryHistory.length > 0 ? (masteryHistory.reduce((a,b)=>a+b,0)/masteryHistory.length*100).toFixed(0) : '—';
+    const successRate = totalActions > 0 ? ((successCount / totalActions) * 100).toFixed(0) : '—';
+    const efficiency = totalSteps > 0 ? (totalReward / totalSteps).toFixed(3) : '—';
+    
+    document.getElementById('stat-success').textContent = `${successRate}%`;
+    document.getElementById('stat-success-sub').textContent = `${successCount}/${totalActions}`;
+    document.getElementById('stat-mastery').textContent = masteryAvg === '—' ? '—' : `${masteryAvg}%`;
+    document.getElementById('stat-efficiency').textContent = efficiency;
+    
+    document.getElementById('perf-episodes').textContent = episodes.length;
+    document.getElementById('perf-steps').textContent = totalSteps;
+    document.getElementById('perf-avg-steps').textContent = avgSteps;
+    document.getElementById('perf-best').textContent = bestEp;
+    document.getElementById('perf-worst').textContent = worstEp;
+    document.getElementById('perf-mastery').textContent = masteryAvg === '—' ? '—' : `${masteryAvg}%`;
+}
+
+// ── Draw Convergence Chart ─────────────────────────────────────────────
+function drawConvergenceChart() {
+    const canvas = document.getElementById('convergenceChart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio||1, rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width*dpr; canvas.height = rect.height*dpr;
+    ctx.scale(dpr,dpr);
+    const W=rect.width, H=rect.height;
+    ctx.clearRect(0,0,W,H);
+    
+    if (masteryHistory.length === 0) {
+        ctx.fillStyle='#6b7280'; ctx.font='13px Inter'; ctx.textAlign='center';
+        ctx.fillText('Mastery convergence as episodes run', W/2, H/2);
+        return;
+    }
+    
+    const pad={top:20,right:20,bottom:30,left:45}, pW=W-pad.left-pad.right, pH=H-pad.top-pad.bottom;
+    const toX=i=>pad.left+(i/(masteryHistory.length-1))*pW, toY=v=>pad.top+pH-((v)*pH);
+    
+    ctx.strokeStyle='rgba(75,85,99,0.15)'; ctx.lineWidth=1;
+    for (let i=0;i<=4;i++) { const y=pad.top+(pH/4)*i; ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+        ctx.fillStyle='#6b7280';ctx.font='10px Inter';ctx.textAlign='right';ctx.fillText((100-i*25)+'%',pad.left-6,y+3); }
+    
+    const cc = '139,92,246';
+    const gr=ctx.createLinearGradient(0,pad.top,0,pad.top+pH);
+    gr.addColorStop(0,`rgba(${cc},0.2)`); gr.addColorStop(1,`rgba(${cc},0)`);
+    ctx.beginPath(); ctx.moveTo(toX(0),pad.top+pH);
+    for (let i=0;i<masteryHistory.length;i++) ctx.lineTo(toX(i),toY(masteryHistory[i]));
+    ctx.lineTo(toX(masteryHistory.length-1),pad.top+pH); ctx.closePath(); ctx.fillStyle=gr; ctx.fill();
+    
+    ctx.beginPath(); ctx.moveTo(toX(0),toY(masteryHistory[0]));
+    for (let i=1;i<masteryHistory.length;i++) ctx.lineTo(toX(i),toY(masteryHistory[i]));
+    ctx.strokeStyle=`rgb(${cc})`; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+    
+    for (let i=0;i<masteryHistory.length;i++) {
+        ctx.beginPath();ctx.arc(toX(i),toY(masteryHistory[i]),3.5,0,Math.PI*2);
+        ctx.fillStyle=`rgb(${cc})`; ctx.fill();
+    }
+}
+
+async function apiCall(env, endpoint, method='POST', body=null) {
+    const opts = { method, headers: {'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    try {
+        const r = await fetch(`/api/${env}/${endpoint}`, opts);
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({error: `HTTP ${r.status}`}));
+            throw new Error(err.error || `HTTP ${r.status}`);
+        }
+        return await r.json();
+    } catch (e) {
+        return { error: e.message || 'Connection failed' };
+    }
+}
+
+async function checkHealth() {
+    try {
+        // Just check the active env (currentEnv) since they all point to :8000
+        const d = await apiCall(currentEnv, 'health', 'GET');
+        document.getElementById('dot-unified').classList.toggle('offline', d.status !== 'healthy');
+    } catch { 
+        document.getElementById('dot-unified').classList.add('offline'); 
+    }
+}
+setInterval(checkHealth, 5000); checkHealth();
+
+function switchEnv(env) {
+    if (running) {
+        alert('Cannot switch environment while running. Stop the episode first.');
+        return;
+    }
+    currentEnv = env;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.env === env));
+    document.getElementById('bars-title').textContent = ENV_CONFIG[env].barsTitle;
+    document.getElementById('bars-icon').textContent = ENV_CONFIG[env].barsIcon;
+    episodes=[]; totalReward=0; rewardHistory=[]; masteryHistory=[]; 
+    totalSteps=0; successCount=0; totalActions=0;
+    lastFeedbackType = null; lastMonitorEpisode = null;
+    updateStats(0,0); updateMetrics(); clearLog(); clearBars(); clearChart();
+    const canvas = document.getElementById('convergenceChart');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    document.getElementById('episode-summary').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>Summary after episode completes</p></div>';
+    addLog(`🔄 Switched to ${env.toUpperCase()} environment`, 'system');
+}
+
+// ── Run episode ──────────────────────────────────────────────────────────
+async function runEpisode() {
+    if (running) return;
+    running = true; stopped = false;
+    document.getElementById('btn-run').disabled = true;
+    document.getElementById('btn-auto').disabled = true;
+    document.getElementById('btn-stop').style.display = '';
+
+    try {
+        const resetData = await apiCall(currentEnv, 'reset');
+        if (resetData.error) { addLog(`❌ Reset failed: ${resetData.error}`, 'system'); return; }
+
+        let obs = resetData.observation, done = false, epReward = 0, stepNum = 0;
+        const maxSteps = ENV_CONFIG[currentEnv].maxSteps;
+        const episodeNum = episodes.length + 1;
+        let epSteps = 0, epSuccess = 0;
+
+        addLog(`🔄 Episode ${episodeNum} started (${currentEnv}) using ${currentStrategy} strategy`, 'system');
+        updateBars(obs); await sleep(stepDelay/2);
+
+        while (!done && stepNum < maxSteps && !stopped) {
+            stepNum++;
+            epSteps++;
+            totalSteps++;
+            updateStats(episodeNum, stepNum);
+
+            let action, logMsg, reason;
+            if (currentEnv === 'easy') {
+                const decide = agentDecideEasy(obs, episodeNum);
+                action = decide;
+                reason = decide.reason;
+                logMsg = `🎯 Step ${stepNum}: ${action.topic} (diff=${action.difficulty})`;
+            } else if (currentEnv === 'medium') {
+                const decide = agentDecideMedium(obs, episodeNum);
+                action = decide;
+                reason = decide.reason;
+                logMsg = `✍️ Rev ${stepNum}: ${action.feedback_type.replace(/_/g,' ')} (spec=${action.specificity})`;
+            } else {
+                const decide = agentDecideHard(obs, episodeNum);
+                action = decide;
+                reason = decide.reason || decide.rationale;
+                logMsg = `💊 Wk ${stepNum}: ${action.intervention_type.replace(/_/g,' ')} (int=${action.intensity})`;
+            }
+            
+            addLog(`${logMsg} | ${reason}`, 'system');
+            await sleep(stepDelay);
+
+            const stepData = await apiCall(currentEnv, 'step', 'POST', { action: action });
+            if (stepData.error) { addLog(`❌ Step failed: ${stepData.error}`, 'system'); break; }
+
+            obs = stepData.observation; done = stepData.done;
+            const reward = stepData.reward || 0; epReward += reward;
+
+            // Track success for easy environment
+            if (currentEnv === 'easy' && stepData.info?.correct) { epSuccess++; }
+            totalActions++;
+
+            // Log result with decision quality feedback
+            if (currentEnv === 'easy') {
+                const c = stepData.info?.correct;
+                if (c) { epSuccess++; successCount++; }
+                addLog(`${c?'✅':'❌'} Student ${c?'correct':'wrong'} → ${reward>=0?'+':''}${reward.toFixed(3)} reward`, c?'correct':'wrong');
+            } else if (currentEnv === 'medium') {
+                const imp = stepData.info?.improvement_from_initial || 0;
+                const grade = stepData.info?.grade || 'C';
+                addLog(`📝 Grade: ${grade} | Δ: ${imp>=0?'+':''}${(imp*100).toFixed(1)}% → ${reward>=0?'+':''}${reward.toFixed(3)}`, 'medium');
+            } else {
+                const eff = stepData.info?.intervention_effective;
+                if (eff) successCount++;
+                addLog(`${eff?'✅':'⚪'} ${eff?'Effective!':'Ineffective'} → ${reward>=0?'+':''}${reward.toFixed(3)}`, eff?'correct':'wrong');
+            }
+
+            updateBars(obs); rewardHistory.push(epReward); drawChart();
+            await sleep(stepDelay/2);
+        }
+
+        totalReward += epReward; episodes.push(epReward);
+        
+        // Calculate and store mastery for convergence tracking
+        let currentMastery = 0;
+        if (currentEnv === 'easy') {
+            const scores = obs.student_profile?.topic_scores || {};
+            currentMastery = Object.values(scores).reduce((a,b)=>a+b,0) / (Object.values(scores).length || 1);
+        } else if (currentEnv === 'medium') {
+            const scores = obs.essay_profile?.quality_scores || {};
+            currentMastery = Object.values(scores).reduce((a,b)=>a+b,0) / (Object.values(scores).length || 1);
+        } else {
+            currentMastery = 1.0 - (obs.student_profile?.dropout_risk || 0);
+        }
+        masteryHistory.push(currentMastery);
+        convergenceData[currentEnv].push(currentMastery);
+        
+        // Update display
+        addLog(`🏁 Episode done! Reward: ${epReward.toFixed(3)} | Steps: ${epSteps} | Success: ${epSuccess}/${epSteps}`, 'reward');
+        updateStats(episodes.length, '✓');
+        updateMetrics();
+        showSummary(epReward, epSteps, obs);
+        drawChart();
+        drawConvergenceChart();
+
+    } catch (err) { addLog(`❌ Error: ${err.message}`, 'system'); }
+    finally {
+        running = false;
+        document.getElementById('btn-run').disabled = false;
+        document.getElementById('btn-auto').disabled = false;
+        document.getElementById('btn-stop').style.display = 'none';
+    }
+}
+
+async function autoRun() { for (let i=0; i<3 && !stopped; i++) { await runEpisode(); if (i<2) await sleep(500); } }
+function stopRun() { stopped = true; }
+
+// ── UI Updates ──────────────────────────────────────────────────────────
+function updateStats(ep, step) {
+    document.getElementById('stat-episodes').textContent = episodes.length || ep || 0;
+    document.getElementById('stat-episodes-sub').textContent = running ? 'in progress' : `${episodes.length} completed`;
+    document.getElementById('stat-reward').textContent = totalReward.toFixed(2);
+    document.getElementById('stat-step').textContent = step;
+    document.getElementById('stat-step-sub').textContent = running ? 'running' : 'idle';
+    document.getElementById('stat-avg').textContent = episodes.length > 0 ? (totalReward/episodes.length).toFixed(2) : '—';
+    updateMetrics();
+}
+
+function updateBars(obs) {
+    const c = document.getElementById('bars-container');
+    if (currentEnv === 'easy') {
+        const scores = obs.student_profile?.topic_scores || {};
+        c.innerHTML = TOPICS.map(t => {
+            const v = (scores[t]||0)*100;
+            return barHTML(t.charAt(0).toUpperCase()+t.slice(1), v, t);
+        }).join('');
+    } else if (currentEnv === 'medium') {
+        const scores = obs.essay_profile?.quality_scores || {};
+        const grade = obs.essay_profile?.overall_grade || 'C';
+        const weak = obs.essay_profile?.weakest_area || '';
+        let html = `<div style="margin-bottom:12px;font-size:0.85rem">
+            Grade: <span class="grade-badge grade-${grade}">${grade}</span>
+            ${weak ? `<span style="margin-left:12px;color:var(--text-muted)">Weakest: <strong style="color:var(--accent-orange)">${weak}</strong></span>` : ''}
+        </div>`;
+        html += QUALITY_DIMS.map(d => {
+            const v = (scores[d]||0)*100;
+            return barHTML(d.charAt(0).toUpperCase()+d.slice(1), v, d);
+        }).join('');
+        c.innerHTML = html;
+    } else {
+        const risks = obs.student_profile?.risk_factors || {};
+        const dr = obs.student_profile?.dropout_risk || 0;
+        let html = `<div style="margin-bottom:12px;font-size:0.85rem"><strong>Dropout Risk:</strong>
+            <span style="color:${dr>0.6?'var(--accent-red)':dr>0.3?'var(--accent-orange)':'var(--accent-green)'};font-weight:700">${(dr*100).toFixed(0)}%</span></div>`;
+        html += Object.entries(risks).sort((a,b)=>b[1]-a[1]).map(([f,v]) => {
+            return barHTML(f.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()), v*100, f);
+        }).join('');
+        c.innerHTML = html;
+    }
+}
+
+function barHTML(label, val, cls) {
+    return `<div class="mastery-bar-container">
+        <div class="mastery-bar-header"><span class="mastery-bar-label">${label}</span><span class="mastery-bar-value">${val.toFixed(0)}%</span></div>
+        <div class="mastery-bar-track"><div class="mastery-bar-fill ${cls}" style="width:${val}%"></div></div></div>`;
+}
+
+function showSummary(reward, steps, obs) {
+    const c = document.getElementById('episode-summary');
+    const avg = episodes.length > 0 ? (totalReward/episodes.length).toFixed(3) : '—';
+    let extra = '';
+    if (currentEnv === 'easy') {
+        const scores = obs.student_profile?.topic_scores || {};
+        const am = (Object.values(scores).reduce((a,b)=>a+b,0)/TOPICS.length*100).toFixed(0);
+        extra = `<div>🎓 Final mastery: <strong style="color:var(--accent-green)">${am}%</strong></div>`;
+    } else if (currentEnv === 'medium') {
+        const grade = obs.essay_profile?.overall_grade || 'C';
+        const scores = obs.essay_profile?.quality_scores || {};
+        const am = (Object.values(scores).reduce((a,b)=>a+b,0)/QUALITY_DIMS.length*100).toFixed(0);
+        extra = `<div>📝 Final grade: <span class="grade-badge grade-${grade}">${grade}</span> (${am}%)</div>`;
+    } else {
+        const r = obs.student_profile?.dropout_risk || 0;
+        extra = `<div>🎓 Final risk: <strong style="color:${r>0.5?'var(--accent-red)':'var(--accent-green)'}">${(r*100).toFixed(0)}%</strong></div>`;
+    }
+    c.innerHTML = `<div style="font-size:0.85rem;line-height:1.8">
+        <div>📊 <strong>Episode ${episodes.length}</strong></div>
+        <div>🎯 Steps: <strong>${steps}</strong></div>
+        <div>💰 Reward: <strong style="color:${reward>=0?'var(--accent-green)':'var(--accent-red)'}">${reward>=0?'+':''}${reward.toFixed(3)}</strong></div>
+        <div>📈 Avg: <strong>${avg}</strong></div>
+        ${extra}
+        <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted)">Total: ${episodes.length} ep · ${totalReward.toFixed(3)} reward</div></div>`;
+}
+
+function addLog(msg, type='') {
+    const log = document.getElementById('action-log');
+    if (log.querySelector('.empty-state')) log.innerHTML='';
+    const e = document.createElement('div');
+    e.className = `log-entry ${type}`;
+    e.innerHTML = `<div>${msg}</div><div class="log-meta">${new Date().toLocaleTimeString()}</div>`;
+    log.prepend(e);
+    while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+function clearLog() { document.getElementById('action-log').innerHTML='<div class="empty-state"><div class="icon">🤖</div><p>Agent actions will appear here</p></div>'; }
+function clearBars() { document.getElementById('bars-container').innerHTML='<div class="empty-state"><div class="icon">📭</div><p>Run an episode to see data</p></div>'; }
+function clearAll() { 
+    episodes=[]; totalReward=0; rewardHistory=[]; masteryHistory=[]; 
+    totalSteps=0; successCount=0; totalActions=0;
+    convergenceData = { easy: [], medium: [], hard: [] };
+    updateStats(0,'—'); updateMetrics(); clearLog(); clearBars(); clearChart();
+    const canvas = document.getElementById('convergenceChart');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    document.getElementById('episode-summary').innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Summary after episode completes</p></div>'; 
+};
+
+// ── Chart ────────────────────────────────────────────────────────────────
+function drawChart() {
+    const canvas = document.getElementById('rewardChart'), ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio||1, rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width*dpr; canvas.height = rect.height*dpr;
+    ctx.scale(dpr,dpr);
+    const W=rect.width, H=rect.height;
+    ctx.clearRect(0,0,W,H);
+    if (rewardHistory.length < 2) { ctx.fillStyle='#6b7280'; ctx.font='13px Inter'; ctx.textAlign='center'; ctx.fillText('Rewards chart as episodes run',W/2,H/2); return; }
+    const pad={top:20,right:20,bottom:30,left:45}, pW=W-pad.left-pad.right, pH=H-pad.top-pad.bottom;
+    const mn=Math.min(...rewardHistory,0), mx=Math.max(...rewardHistory,0.1), rng=mx-mn||1;
+    const toX=i=>pad.left+(i/(rewardHistory.length-1))*pW, toY=v=>pad.top+pH-((v-mn)/rng)*pH;
+    ctx.strokeStyle='rgba(75,85,99,0.15)'; ctx.lineWidth=1;
+    for (let i=0;i<=4;i++) { const y=pad.top+(pH/4)*i; ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
+        ctx.fillStyle='#6b7280';ctx.font='10px Inter';ctx.textAlign='right';ctx.fillText((mx-(rng/4)*i).toFixed(2),pad.left-6,y+3); }
+    const gr=ctx.createLinearGradient(0,pad.top,0,pad.top+pH);
+    const envColors = {easy:'59,130,246', medium:'234,179,8', hard:'239,68,68'};
+    const cc = envColors[currentEnv]||'59,130,246';
+    gr.addColorStop(0,`rgba(${cc},0.15)`); gr.addColorStop(1,`rgba(${cc},0)`);
+    ctx.beginPath(); ctx.moveTo(toX(0),pad.top+pH);
+    for (let i=0;i<rewardHistory.length;i++) ctx.lineTo(toX(i),toY(rewardHistory[i]));
+    ctx.lineTo(toX(rewardHistory.length-1),pad.top+pH); ctx.closePath(); ctx.fillStyle=gr; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(toX(0),toY(rewardHistory[0]));
+    for (let i=1;i<rewardHistory.length;i++) ctx.lineTo(toX(i),toY(rewardHistory[i]));
+    ctx.strokeStyle=`rgb(${cc})`; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+    for (let i=0;i<rewardHistory.length;i++) { ctx.beginPath();ctx.arc(toX(i),toY(rewardHistory[i]),3,0,Math.PI*2);ctx.fillStyle=`rgb(${cc})`;ctx.fill(); }
+}
+function clearChart() { const c=document.getElementById('rewardChart').getContext('2d'); c.clearRect(0,0,c.canvas.width,c.canvas.height); drawChart(); }
+
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+function updateSpeed() { stepDelay=parseInt(document.getElementById('speed').value); }
+window.addEventListener('resize', () => { drawChart(); drawConvergenceChart(); }); 
+setTimeout(() => { drawChart(); drawConvergenceChart(); }, 100);
+</script>
+</body>
+</html>
