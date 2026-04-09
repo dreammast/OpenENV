@@ -37,6 +37,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the dashboard app which now includes OpenEnv API endpoints
-# This makes it compatible with both the validator (port 8000) and the interactive dashboard
-CMD python -m uvicorn dashboard.app:app --host 0.0.0.0 --port 8000
+# Run the OpenEnv server app directly (already has all routes configured)
+# dashboard.app wraps it for local development but for production we use the core app
+CMD python -m uvicorn openenv_core_submission.server.app:app --host 0.0.0.0 --port 8000
